@@ -9,7 +9,7 @@ public class primeRobo extends AdvancedRobot {
     private Random random = new Random();
     private double enemyDist;
     private boolean isMovingFw = true;
-    private final double PERCENT_SUBSQUARE = 0.2;
+    private final double PERCENT_SUBSQUARE = 0.1;
     private boolean foundEnemy = false;
 
     public void run() {
@@ -23,8 +23,7 @@ public class primeRobo extends AdvancedRobot {
             if (getRadarTurnRemaining() == 0) setTurnRadarRight(360);
             if (random.nextInt(20) == 10) isMovingFw = !isMovingFw;
             if (random.nextInt(30) == 10) setTurnRight(random.nextInt(110) - 45);
-            setAhead(isMovingFw ? 100 : -100);
-            avoidWalls();
+            if(!avoidWalls()) setAhead(isMovingFw ? 100 : -100);
             execute();
         }
 
@@ -56,12 +55,13 @@ public class primeRobo extends AdvancedRobot {
         }
     }
 
-    private void avoidWalls () {
+    private boolean avoidWalls () {
         double width = getBattleFieldWidth();
         double height = getBattleFieldHeight();
         double x = getX();
         double y = getY();
         double buffer = PERCENT_SUBSQUARE * Math.max(width, height);
+        boolean avoidWalls = false;
 
         // The angles are given as a compass, as in:
         // 0: North
@@ -73,24 +73,31 @@ public class primeRobo extends AdvancedRobot {
         if (y < buffer) {
             if (getHeading() >= 180 && getHeading() <= 270) setTurnRight(90);
             else if (getHeading() >= 90  && getHeading() < 180 ) setTurnLeft(90);
+            avoidWalls = true;
         }
         // Closing in the top wall
         else if (y > height - buffer) {
             if (getHeading() >= 0 && getHeading() <= 90) setTurnRight(90);
             else if (getHeading() >= 270 && getHeading() < 360) setTurnLeft(90);
+            avoidWalls = true;
         }
         // Closing in the left wall
         else if (x < buffer) {
             if (getHeading() >= 270 && getHeading() <= 360) setTurnRight(90);
             else if (getHeading() >= 180 && getHeading() < 270) setTurnLeft(90);
+            avoidWalls = true;
         }
         // Closing in the right wall
         else if (x >= width - buffer) {
             if (getHeading() >= 90 && getHeading() <= 180) setTurnRight(90);
             else if (getHeading() >= 0 && getHeading() < 90)  setTurnLeft(90);
+            avoidWalls = true;
         }
-        setAhead(100);
-        isMovingFw = true;
+        if (avoidWalls) {
+            setAhead(100);
+            isMovingFw = true;
+        }
+        return avoidWalls;
     }
 
     public void onHitWall(HitWallEvent e) {
@@ -125,7 +132,7 @@ public class primeRobo extends AdvancedRobot {
         setTurnRadarRight(radarTurn * 2);
         enemyDist = e.getDistance();
 
-        randomizeMovement (e);
+        if (!avoidWalls()) randomizeMovement (e);
         aimAndShooting(e);
     }
 
