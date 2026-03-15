@@ -18,9 +18,11 @@ public class primeRobo extends AdvancedRobot {
         setColors(Color.YELLOW, Color.BLUE, Color.GREEN, Color.YELLOW,
                 Color.BLUE);
 
+        setAdjustGunForRobotTurn(true);
+        setAdjustRadarForGunTurn(true);
 
         while (true) {
-            if (getRadarTurnRemaining() == 0) setTurnRadarRight(360);
+            if (!foundEnemy) setTurnRadarRight(360);
             if (random.nextInt(20) == 10) isMovingFw = !isMovingFw;
             if (random.nextInt(30) == 10) setTurnRight(random.nextInt(110) - 45);
             if(!avoidWalls()) setAhead(isMovingFw ? 100 : -100);
@@ -51,7 +53,7 @@ public class primeRobo extends AdvancedRobot {
             setTurnRight(Utils.normalRelativeAngleDegrees(e.getBearing() + 90));
             if (isMovingFw) setAhead(100);
             else setAhead(-100);
-            if (random.nextInt(20) == 7) isMovingFw = !isMovingFw;
+            if (random.nextInt(10) == 7) isMovingFw = !isMovingFw;
         }
     }
 
@@ -61,7 +63,10 @@ public class primeRobo extends AdvancedRobot {
         double x = getX();
         double y = getY();
         double buffer = PERCENT_SUBSQUARE * Math.max(width, height);
-        boolean avoidWalls = false;
+        boolean avoidingWalls = false;
+
+        double realHeading = getHeading();
+        if (!isMovingFw) realHeading = (realHeading + 180) % 360;
 
         // The angles are given as a compass, as in:
         // 0: North
@@ -71,33 +76,33 @@ public class primeRobo extends AdvancedRobot {
 
         // Closing in the bottom wall
         if (y < buffer) {
-            if (getHeading() >= 180 && getHeading() <= 270) setTurnRight(90);
-            else if (getHeading() >= 90  && getHeading() < 180 ) setTurnLeft(90);
-            avoidWalls = true;
+            if (realHeading >= 180 && realHeading <= 270) setTurnRight(90);
+            else if (realHeading >= 90  && realHeading < 180 ) setTurnLeft(90);
+            avoidingWalls = true;
         }
         // Closing in the top wall
         else if (y > height - buffer) {
-            if (getHeading() >= 0 && getHeading() <= 90) setTurnRight(90);
-            else if (getHeading() >= 270 && getHeading() < 360) setTurnLeft(90);
-            avoidWalls = true;
+            if (realHeading >= 0 && realHeading <= 90) setTurnRight(90);
+            else if (realHeading >= 270 && realHeading < 360) setTurnLeft(90);
+            avoidingWalls = true;
         }
         // Closing in the left wall
         else if (x < buffer) {
-            if (getHeading() >= 270 && getHeading() <= 360) setTurnRight(90);
-            else if (getHeading() >= 180 && getHeading() < 270) setTurnLeft(90);
-            avoidWalls = true;
+            if (realHeading >= 270 && realHeading <= 360) setTurnRight(90);
+            else if (realHeading >= 180 && realHeading < 270) setTurnLeft(90);
+            avoidingWalls = true;
         }
         // Closing in the right wall
         else if (x >= width - buffer) {
-            if (getHeading() >= 90 && getHeading() <= 180) setTurnRight(90);
-            else if (getHeading() >= 0 && getHeading() < 90)  setTurnLeft(90);
-            avoidWalls = true;
+            if (realHeading >= 90 && realHeading <= 180) setTurnRight(90);
+            else if (realHeading >= 0 && realHeading < 90)  setTurnLeft(90);
+            avoidingWalls = true;
         }
-        if (avoidWalls) {
+        if (avoidingWalls) {
             setAhead(100);
             isMovingFw = true;
         }
-        return avoidWalls;
+        return avoidingWalls;
     }
 
     public void onHitWall(HitWallEvent e) {
@@ -128,21 +133,20 @@ public class primeRobo extends AdvancedRobot {
 
     public void onScannedRobot(ScannedRobotEvent e) {
         foundEnemy = true;
-        double radarTurn = getHeading() + e.getBearing() - getRadarHeading();
-        setTurnRadarRight(radarTurn * 2);
         enemyDist = e.getDistance();
 
-        if (!avoidWalls()) randomizeMovement (e);
+        double radarTurn = getHeading() + e.getBearing() - getRadarHeading();
+        while (radarTurn > 180) radarTurn -= 360;
+        while (radarTurn < -180) radarTurn += 360;
+        setTurnRadarRight(radarTurn * 2);
+
+        if (!avoidWalls()) randomizeMovement(e);
         aimAndShooting(e);
     }
 
     private void aimAndShooting (ScannedRobotEvent e) {
         double eHeading = e.getHeading();
         double eVelocity = e.getVelocity();
-        double radarTurn = getHeading() + e.getBearing() - getRadarHeading();
-
-        while (radarTurn > 180) radarTurn -= 360;
-        while (radarTurn < -180) radarTurn += 360;
 
         double absBearing = getHeading() + e.getBearing();
         double eX = getX() + Math.sin(Math.toRadians(absBearing)) * enemyDist;
