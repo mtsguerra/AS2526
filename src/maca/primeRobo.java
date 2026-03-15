@@ -23,40 +23,51 @@ public class primeRobo extends AdvancedRobot {
 
         while (true) {
             if (!foundEnemy) setTurnRadarRight(360);
-            if (random.nextInt(20) == 10) isMovingFw = !isMovingFw;
-            if (random.nextInt(30) == 10) setTurnRight(random.nextInt(110) - 45);
             if(!avoidWalls()) setAhead(isMovingFw ? 100 : -100);
             execute();
         }
 
     }
 
+    /**
+     * Tries to keep an ideal distance of 200 from the enemy, only changing
+     * the movement in case of a relevant distanceError. In the case of
+     * already in the range tries to keep the distance and uses an offset
+     * angle to avoid predictive movement such as going back and forth or a
+     * perfect circle.
+     * @param e current event
+     */
     private void randomizeMovement (ScannedRobotEvent e) {
-        // try to keep an ideal distance of 200 from the enemy
         double idealDistance = 200;
         double distanceError = e.getDistance() - idealDistance;
-        // Only changing the movement in case of a relevant distanceError
         if (Math.abs(distanceError) > 20) {
             // Too far, tries to close in the distance
             if (distanceError > 0) {
                 setTurnRight(e.getBearing());
-                setAhead(distanceError * 0.33);
+                setAhead(distanceError * 0.5);
             }
             // Too close, tries to move away
             else {
                 setTurnRight(e.getBearing() - 180);
-                setAhead(-distanceError * 0.33);
+                setAhead(-distanceError * 0.5);
             }
         }
         else{
-            // keeps perpendicular movements around the range
-            setTurnRight(Utils.normalRelativeAngleDegrees(e.getBearing() + 90));
-            if (isMovingFw) setAhead(100);
-            else setAhead(-100);
-            if (random.nextInt(10) == 7) isMovingFw = !isMovingFw;
+            double angleOffset = (random.nextDouble() * 40) - 20;
+            setTurnRight(Utils.normalRelativeAngleDegrees(e.getBearing() + 90 +  angleOffset));
+            if (isMovingFw) setAhead(150);
+            else setAhead(-150);
+            if (random.nextInt(100) == 7) isMovingFw = !isMovingFw;
         }
     }
 
+    /**
+     * To try avoiding the walls it keeps track of the angle the robot is
+     * heading, using the Cartesian Coordinate System as reference, and based
+     * off the angle it calculates the direction it must turn to avoid
+     * hitting walls. Also handles the special case of getting into a corner.
+     * @return is currently avoiding a wall
+     */
     private boolean avoidWalls () {
         double width = getBattleFieldWidth();
         double height = getBattleFieldHeight();
@@ -64,6 +75,20 @@ public class primeRobo extends AdvancedRobot {
         double y = getY();
         double buffer = PERCENT_SUBSQUARE * Math.max(width, height);
         boolean avoidingWalls = false;
+
+        boolean nearXWalls = (x < buffer || x >= width - buffer);
+        boolean nearYWalls = (y < buffer || y >= height - buffer);
+        if (!nearXWalls && !nearYWalls) return false;
+        if (nearXWalls && nearYWalls) {
+            double angleReativeCenter =
+                    Math.toDegrees(Math.atan2((width / 2) - x, (height / 2) - y));
+            double turnAngle =
+                    Utils.normalRelativeAngleDegrees(angleReativeCenter - getHeading());
+            setTurnRight(turnAngle);
+            setAhead(150);
+            isMovingFw = true;
+            return true;
+        }
 
         double realHeading = getHeading();
         if (!isMovingFw) realHeading = (realHeading + 180) % 360;
@@ -105,22 +130,34 @@ public class primeRobo extends AdvancedRobot {
         return avoidingWalls;
     }
 
+    /**
+     * Basic command to turn directions in case of hitting a wall
+     * @param e current event
+     */
     public void onHitWall(HitWallEvent e) {
-        // just turn directions
         setTurnRight(Utils.normalRelativeAngleDegrees(180 - e.getBearing()));
         isMovingFw = !isMovingFw;
         setAhead(isMovingFw ? 150 : -150);
     }
 
+    /**
+     * In case of getting hit by a bullet tries to change direction and dodge
+     * it perpendicular to the bullet direction to make it harder to hit
+     * @param e current event
+     */
     public void onHitByBullet(HitByBulletEvent e) {
-        // changes direction and dodges it perpendicular to the bullet
-        // direction to make it harder to hit
         double bulletBearing = e.getBearing();
         setTurnRight(Utils.normalRelativeAngleDegrees(90 - bulletBearing));
         isMovingFw = !isMovingFw;
         setAhead(isMovingFw ? 150 : -150);
     }
 
+    /**
+     * If hitting a robot, and it is not the enemy fault, tries to move away
+     * from it and keep the aim locked
+     * at the robot
+     * @param e current event
+     */
     public void onHitRobot(HitRobotEvent e) {
         if (e.isMyFault()){
             setTurnRight(Utils.normalRelativeAngleDegrees(e.getBearing() + 180));
@@ -187,5 +224,20 @@ public class primeRobo extends AdvancedRobot {
 
     public void onRobotDeath(RobotDeathEvent e) {
         foundEnemy = false;
+    }
+
+    /**
+     * Just a funny celebration to winning!
+     * @param e current event
+     */
+    public void onWin(WinEvent e) {
+        for (int i = 0; i < 100; i++) {
+            setTurnRight(360);
+            setTurnGunRight(360);
+            setTurnRadarLeft(360);
+            setAhead(100);
+            fire(0.01);
+            execute();
+        }
     }
 }
